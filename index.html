@@ -233,6 +233,7 @@
   <div class="card">
     <h3>📊 Historial del Día</h3>
     <div id="historialInicialContenido"><div class="hist-empty">Sin cuentas registradas hoy</div></div>
+    <button class="btn-secondary" onclick="limpiarHistorial()" style="margin-top:12px;background:#FFE0E0;color:#C0392B;border:none">🗑 Limpiar historial del día</button>
   </div>
 </div>
 
@@ -759,6 +760,16 @@ function renderHistorialInicial() {
       </div>
     `).join('')}
   `;
+}
+
+// ── LIMPIAR HISTORIAL ─────────────────────────────────────────────────────
+function limpiarHistorial() {
+  if (confirm("¿Limpiar todo el historial del día? Esta acción no se puede deshacer.")) {
+    historial = [];
+    localStorage.removeItem('historial_spa');
+    renderHistorialInicial();
+    alert("✅ Historial limpiado correctamente.");
+  }
 }
 
 // ── INIT ──────────────────────────────────────────────────────────────────
