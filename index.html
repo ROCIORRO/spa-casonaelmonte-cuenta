@@ -65,7 +65,7 @@
 
   /* CATÁLOGO */
   .cat-section { margin-bottom: 16px; }
-  .cat-title { font-size: 12px; font-weight: bold; color: var(--eucal); text-transform: uppercase; letter-spacing: 0.5px; padding: 6px 0; border-bottom: 1px solid var(--agua); margin-bottom: 8px; }
+  .cat-title { font-size: 16px; font-weight: 800; color: var(--musgo); text-transform: uppercase; letter-spacing: 0.5px; padding: 8px 0 8px 10px; border-bottom: 2px solid var(--dorado); border-left: 4px solid var(--dorado); margin-bottom: 10px; margin-top: 4px; background: var(--agua); border-radius: 4px; }
   .search-box { width: 100%; padding: 10px 12px; border: 1.5px solid var(--agua); border-radius: 8px; font-size: 14px; background: white; margin-bottom: 12px; }
   .item-btn { width: 100%; display: flex; justify-content: space-between; align-items: center; padding: 10px 12px; background: white; border: 1.5px solid var(--agua); border-radius: 8px; margin-bottom: 6px; cursor: pointer; text-align: left; transition: all 0.15s; }
   .item-btn:active { background: var(--agua); }
@@ -120,6 +120,25 @@
 
   .empty-cuenta { text-align: center; padding: 30px; color: var(--eucal); font-size: 13px; }
   .tag-hora { font-size: 10px; color: #999; margin-top: 2px; }
+
+  /* SELECTOR DE CUENTAS ABIERTAS */
+  .cuenta-abierta-card { background: white; border-radius: 12px; padding: 14px 16px; margin-bottom: 10px; box-shadow: 0 1px 4px rgba(0,0,0,0.08); display: flex; justify-content: space-between; align-items: center; cursor: pointer; border-left: 4px solid var(--musgo); transition: background 0.15s; }
+  .cuenta-abierta-card:active { background: var(--agua); }
+  .cuenta-abierta-card.alerta { border-left-color: #FF4444; }
+  .cac-info .cac-nombre { font-size: 14px; font-weight: bold; color: var(--musgo); }
+  .cac-info .cac-detalle { font-size: 11px; color: var(--eucal); margin-top: 2px; }
+  .cac-monto { font-size: 15px; font-weight: bold; color: var(--musgo); margin-right: 8px; }
+  .cac-monto.alerta { color: #FF4444; }
+  .btn-nueva-cuenta-fab { width: 100%; padding: 14px; background: var(--dorado); color: white; border: none; border-radius: 10px; font-size: 15px; font-weight: bold; cursor: pointer; margin-top: 4px; margin-bottom: 16px; }
+
+  /* PESTAÑAS DE CLIENTES (multi-cuenta) */
+  .clientes-tabs { display: flex; gap: 6px; overflow-x: auto; background: white; padding: 8px 10px; position: sticky; top: 88px; z-index: 97; border-bottom: 1px solid var(--agua); -webkit-overflow-scrolling: touch; }
+  .clientes-tabs::-webkit-scrollbar { display: none; }
+  .cliente-chip { flex: 0 0 auto; padding: 6px 12px; border-radius: 16px; background: var(--gris); color: var(--eucal); font-size: 12px; font-weight: bold; border: 1.5px solid var(--agua); white-space: nowrap; cursor: pointer; }
+  .cliente-chip.activo { background: var(--musgo); color: white; border-color: var(--musgo); }
+  .cliente-chip.alerta-chip { border-color: #FF4444; color: #FF4444; }
+  .cliente-chip.activo.alerta-chip { background: #FF4444; color: white; border-color: #FF4444; }
+  .btn-chip-nueva { flex: 0 0 auto; padding: 6px 12px; border-radius: 16px; background: var(--dorado); color: white; font-size: 14px; font-weight: bold; border: none; cursor: pointer; }
 </style>
 </head>
 <body>
@@ -148,15 +167,27 @@
   <button class="nav-tab" onclick="mostrarVista('historial',this)">Historial</button>
 </div>
 
-<!-- VISTA: NUEVA CUENTA -->
-<div class="vista activa" id="vista-nueva">
+<div class="clientes-tabs" id="clientesTabs" style="display:none"></div>
+
+<!-- VISTA: SELECTOR DE CUENTAS ABIERTAS -->
+<div class="vista" id="vista-selector">
   <button class="btn-secondary" onclick="mostrarVistaInicial('historial-inicial')" style="margin-bottom:8px">📊 Ver Historial del Día</button>
+  <div class="card">
+    <h3>🗂️ Cuentas Abiertas</h3>
+    <div id="selectorContenido"></div>
+  </div>
+  <button class="btn-nueva-cuenta-fab" onclick="mostrarVista('nueva')">✨ Abrir Nueva Cuenta</button>
+</div>
+
+<!-- VISTA: NUEVA CUENTA -->
+<div class="vista" id="vista-nueva">
+  <button class="btn-secondary" id="btnVolverSelector" onclick="mostrarVista('selector')" style="margin-bottom:8px">← Volver a cuentas abiertas</button>
 
   <div class="card">
     <h3>✨ Abrir Nueva Cuenta</h3>
     <div class="field">
       <label>Nombre del Cliente</label>
-      <input type="text" id="inputNombre" placeholder="Escribir nombre..." autocomplete="off">
+      <input type="text" id="inputNombre" placeholder="Nombre y apellido..." autocomplete="off">
     </div>
     <div class="field">
       <label>Plan Contratado</label>
@@ -440,13 +471,37 @@ const CATALOGO = [
     { n: "Reiki 45 min.", p: 30000 },
     { n: "Flores de Bach 45 min.", p: 30000 },
   ]},
+  { cat: "🏷️ Artículos e Implementos", items: [
+    { n: "Gorra piscina", p: 3000 },
+    { n: "Pantuflas", p: 3000 },
+    { n: "Bata", p: 3000 },
+    { n: "Toalla", p: 3000 },
+    { n: "Candado", p: 3000 },
+  ]},
 ];
 
 // ── ESTADO ────────────────────────────────────────────────────────────────
-let cuentaActual = null;
+// cuentasAbiertas: { id: {nombre, plan, atiende, responsable, items, hora, fecha} }
+let cuentasAbiertas = JSON.parse(localStorage.getItem('cuentas_abiertas_spa') || '{}');
+let cuentaActivaId = localStorage.getItem('cuenta_activa_spa') || null;
 let historial = JSON.parse(localStorage.getItem('historial_spa') || '[]');
 let itemSeleccionado = null;
 let qtyActual = 1;
+
+// Getter de conveniencia: la cuenta con la que se está trabajando ahora mismo
+function cuentaActual() {
+  return cuentaActivaId ? cuentasAbiertas[cuentaActivaId] : null;
+}
+
+function guardarCuentasAbiertas() {
+  localStorage.setItem('cuentas_abiertas_spa', JSON.stringify(cuentasAbiertas));
+  if (cuentaActivaId) localStorage.setItem('cuenta_activa_spa', cuentaActivaId);
+  else localStorage.removeItem('cuenta_activa_spa');
+}
+
+function generarIdCuenta() {
+  return 'c_' + Date.now() + '_' + Math.random().toString(36).slice(2, 7);
+}
 
 // ── FUNCIONES PRINCIPALES ─────────────────────────────────────────────────
 function abrirCuenta() {
@@ -458,18 +513,89 @@ function abrirCuenta() {
   if (!plan) { alert('Por favor selecciona el plan contratado.'); return; }
   if (!atiende) { alert('Por favor selecciona quién atiende.'); return; }
 
-  cuentaActual = {
+  const id = generarIdCuenta();
+  cuentasAbiertas[id] = {
     nombre, plan, atiende, responsable,
     items: [],
     hora: new Date().toLocaleTimeString('es-CL', {hour:'2-digit', minute:'2-digit'}),
     fecha: new Date().toLocaleDateString('es-CL')
   };
+  cuentaActivaId = id;
+  guardarCuentasAbiertas();
 
   document.getElementById('resumenBar').style.display = 'flex';
   document.getElementById('navTabs').style.display = 'flex';
+  document.getElementById('clientesTabs').style.display = 'flex';
+
+  // Limpiar formulario para la próxima apertura
+  document.getElementById('inputNombre').value = '';
+  document.getElementById('selectPlan').value = '';
+  document.getElementById('selectAtiende').value = '';
+  document.getElementById('selectResponsable').value = '';
+  document.getElementById('planNombreBadge').style.display = 'none';
+
   actualizarResumen();
+  renderClientesTabs();
   renderCatalogo();
   mostrarVista('catalogo', document.querySelector('.nav-tab'));
+}
+
+// Cambia el foco a otra cuenta abierta (sin cerrar ni perder ninguna)
+function cambiarCuentaActiva(id) {
+  if (!cuentasAbiertas[id]) return;
+  cuentaActivaId = id;
+  guardarCuentasAbiertas();
+  actualizarResumen();
+  renderClientesTabs();
+  renderCuenta();
+  renderCatalogo();
+  mostrarVista('cuenta', document.querySelectorAll('.nav-tab')[1]);
+}
+
+// Pantalla selector: lista de todas las cuentas abiertas (para elegir o crear una nueva)
+function renderSelector() {
+  const cont = document.getElementById('selectorContenido');
+  const ids = Object.keys(cuentasAbiertas);
+  if (!ids.length) {
+    cont.innerHTML = '<div class="empty-cuenta">No hay cuentas abiertas todavía.<br>Toca "Abrir Nueva Cuenta" para comenzar.</div>';
+    return;
+  }
+  cont.innerHTML = ids.map(id => {
+    const c = cuentasAbiertas[id];
+    const total = c.items.reduce((s, i) => s + i.subtotal, 0);
+    const alerta = total >= 25000;
+    return `
+      <div class="cuenta-abierta-card ${alerta ? 'alerta' : ''}" onclick="cambiarCuentaActiva('${id}')">
+        <div class="cac-info">
+          <div class="cac-nombre">${c.nombre}</div>
+          <div class="cac-detalle">${c.plan} · desde ${c.hora} · ${c.items.length} ítem(s)</div>
+        </div>
+        <div style="display:flex;align-items:center">
+          <span class="cac-monto ${alerta ? 'alerta' : ''}">$${total.toLocaleString('es-CL')}</span>
+        </div>
+      </div>
+    `;
+  }).join('');
+}
+
+// Barra de pestañas rápidas para saltar entre clientes sin volver al selector
+function renderClientesTabs() {
+  const cont = document.getElementById('clientesTabs');
+  const ids = Object.keys(cuentasAbiertas);
+  if (!ids.length) { cont.style.display = 'none'; return; }
+  cont.style.display = 'flex';
+  cont.innerHTML = ids.map(id => {
+    const c = cuentasAbiertas[id];
+    const total = c.items.reduce((s, i) => s + i.subtotal, 0);
+    const alerta = total >= 25000;
+    const activo = id === cuentaActivaId;
+    return `<button class="cliente-chip ${activo ? 'activo' : ''} ${alerta ? 'alerta-chip' : ''}" onclick="cambiarCuentaActiva('${id}')">${c.nombre}</button>`;
+  }).join('') + `<button class="btn-chip-nueva" onclick="irANuevaCuentaDesdeDentro()">+ Nueva</button>`;
+}
+
+// Permite abrir otra cuenta nueva sin cerrar la actual ni perder su información
+function irANuevaCuentaDesdeDentro() {
+  mostrarVista('nueva');
 }
 
 function actualizarPlanInfo() {
@@ -505,6 +631,10 @@ function mostrarVista(id, btn) {
   if (btn) btn.classList.add('activa');
   if (id === 'cuenta') renderCuenta();
   if (id === 'historial') renderHistorial();
+  if (id === 'selector') renderSelector();
+  // El botón "Volver" en el formulario de nueva cuenta solo tiene sentido si hay otras cuentas abiertas
+  const btnVolver = document.getElementById('btnVolverSelector');
+  if (btnVolver) btnVolver.style.display = Object.keys(cuentasAbiertas).length ? 'block' : 'none';
 }
 
 // ── CATÁLOGO ──────────────────────────────────────────────────────────────
@@ -549,16 +679,19 @@ function cambiarQty(delta) {
 }
 
 function confirmarAgregar() {
-  if (!itemSeleccionado || !cuentaActual) return;
-  cuentaActual.items.push({
+  const cuenta = cuentaActual();
+  if (!itemSeleccionado || !cuenta) return;
+  cuenta.items.push({
     nombre: itemSeleccionado.n,
     precio: itemSeleccionado.p,
     cantidad: qtyActual,
     subtotal: itemSeleccionado.p * qtyActual,
     hora: new Date().toLocaleTimeString('es-CL', {hour:'2-digit', minute:'2-digit'})
   });
+  guardarCuentasAbiertas();
   cerrarModal('modalCantidad');
   actualizarResumen();
+  renderClientesTabs();
   // Feedback visual
   const btn = document.createElement('div');
   btn.style.cssText = 'position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);background:#27AE60;color:white;padding:12px 24px;border-radius:10px;font-weight:bold;z-index:9999;font-size:14px';
@@ -568,29 +701,34 @@ function confirmarAgregar() {
 }
 
 function agregarLibre() {
+  const cuenta = cuentaActual();
+  if (!cuenta) return;
   const nombre = document.getElementById('libreNombre').value.trim();
   const monto = parseInt(document.getElementById('libreMonto').value);
   if (!nombre || !monto || monto <= 0) { alert('Ingresa descripción y monto válido.'); return; }
-  cuentaActual.items.push({
+  cuenta.items.push({
     nombre, precio: monto, cantidad: 1, subtotal: monto,
     hora: new Date().toLocaleTimeString('es-CL', {hour:'2-digit', minute:'2-digit'})
   });
+  guardarCuentasAbiertas();
   document.getElementById('libreNombre').value = '';
   document.getElementById('libreMonto').value = '';
   actualizarResumen();
+  renderClientesTabs();
   alert('✓ Ítem libre agregado.');
 }
 
 // ── CUENTA ACTUAL ─────────────────────────────────────────────────────────
 function renderCuenta() {
-  if (!cuentaActual) return;
+  const cuenta = cuentaActual();
+  if (!cuenta) return;
   const cont = document.getElementById('cuentaItems');
-  const total = cuentaActual.items.reduce((s, i) => s + i.subtotal, 0);
+  const total = cuenta.items.reduce((s, i) => s + i.subtotal, 0);
 
-  if (!cuentaActual.items.length) {
+  if (!cuenta.items.length) {
     cont.innerHTML = '<div class="empty-cuenta">Sin ítems agregados aún</div>';
   } else {
-    cont.innerHTML = cuentaActual.items.map((item, idx) => `
+    cont.innerHTML = cuenta.items.map((item, idx) => `
       <div class="cuenta-item">
         <div class="ci-info">
           <div class="ci-nombre">${item.nombre}</div>
@@ -608,51 +746,71 @@ function renderCuenta() {
 }
 
 function eliminarItem(idx) {
+  const cuenta = cuentaActual();
+  if (!cuenta) return;
   if (confirm('¿Eliminar este ítem?')) {
-    cuentaActual.items.splice(idx, 1);
+    cuenta.items.splice(idx, 1);
+    guardarCuentasAbiertas();
     actualizarResumen();
     renderCuenta();
+    renderClientesTabs();
   }
 }
 
 function actualizarResumen() {
-  if (!cuentaActual) return;
-  const total = cuentaActual.items.reduce((s, i) => s + i.subtotal, 0);
-  document.getElementById('resNombre').textContent = cuentaActual.nombre;
+  const cuenta = cuentaActual();
+  if (!cuenta) return;
+  const total = cuenta.items.reduce((s, i) => s + i.subtotal, 0);
+  document.getElementById('resNombre').textContent = cuenta.nombre;
   document.getElementById('resBadge').textContent = `$${total.toLocaleString('es-CL')}`;
   document.getElementById('resBadge').className = 'total-badge' + (total >= 25000 ? ' alerta' : '');
-  document.getElementById('resEstado').textContent = total >= 25000 ? '⚠️ COBRAR AHORA' : (total > 0 ? `${cuentaActual.items.length} ítem(s)` : 'Sin ítems');
+  document.getElementById('resEstado').textContent = total >= 25000 ? '⚠️ COBRAR AHORA' : (total > 0 ? `${cuenta.items.length} ítem(s)` : 'Sin ítems');
 }
 
 function cobrarYCerrar() {
-  if (!cuentaActual) return;
-  const total = cuentaActual.items.reduce((s, i) => s + i.subtotal, 0);
-  if (!confirm(`¿Confirmar cobro de $${total.toLocaleString('es-CL')} a ${cuentaActual.nombre}?`)) return;
-  
-  historial.unshift({ ...cuentaActual, total, cobrada: true, horaCierre: new Date().toLocaleTimeString('es-CL', {hour:'2-digit', minute:'2-digit'}) });
+  const cuenta = cuentaActual();
+  if (!cuenta) return;
+  const total = cuenta.items.reduce((s, i) => s + i.subtotal, 0);
+  if (!confirm(`¿Confirmar cobro de $${total.toLocaleString('es-CL')} a ${cuenta.nombre}?`)) return;
+
+  historial.unshift({ idHistorial: generarIdCuenta(), ...cuenta, total, cobrada: true, horaCierre: new Date().toLocaleTimeString('es-CL', {hour:'2-digit', minute:'2-digit'}) });
   localStorage.setItem('historial_spa', JSON.stringify(historial));
-  
-  enviarASheets(cuentaActual, total);
-  resetearCuenta();
-  alert(`✅ Cuenta de ${cuentaActual ? cuentaActual.nombre : 'cliente'} cobrada y cerrada.\n\nTotal: $${total.toLocaleString('es-CL')}`);
+
+  enviarASheets(cuenta, total);
+
+  const nombreCliente = cuenta.nombre;
+  // Se elimina SOLO esta cuenta; el resto de cuentas abiertas permanecen intactas
+  delete cuentasAbiertas[cuentaActivaId];
+  cuentaActivaId = null;
+  guardarCuentasAbiertas();
+
+  alert(`✅ Cuenta de ${nombreCliente} cobrada y cerrada.\n\nTotal: $${total.toLocaleString('es-CL')}`);
+  irASiguienteVistaTrasCierre();
 }
 
 function cancelarCuenta() {
+  const cuenta = cuentaActual();
+  if (!cuenta) return;
   if (!confirm('¿Cancelar esta cuenta? Se perderán todos los ítems registrados.')) return;
-  resetearCuenta();
+  delete cuentasAbiertas[cuentaActivaId];
+  cuentaActivaId = null;
+  guardarCuentasAbiertas();
+  irASiguienteVistaTrasCierre();
 }
 
-function resetearCuenta() {
-  cuentaActual = null;
-  document.getElementById('resumenBar').style.display = 'none';
-  document.getElementById('navTabs').style.display = 'none';
-  document.getElementById('inputNombre').value = '';
-  document.getElementById('selectPlan').value = '';
-  document.getElementById('selectAtiende').value = '';
-  document.getElementById('selectResponsable').value = '';
-  document.getElementById('planNombreBadge').style.display = 'none';
-  document.querySelectorAll('.vista').forEach(v => v.classList.remove('activa'));
-  document.getElementById('vista-nueva').classList.add('activa');
+// Tras cobrar o cancelar una cuenta: si quedan otras abiertas, deja elegir; si no, vuelve al formulario de nueva cuenta
+function irASiguienteVistaTrasCierre() {
+  const idsRestantes = Object.keys(cuentasAbiertas);
+  if (idsRestantes.length) {
+    renderSelector();
+    renderClientesTabs();
+    mostrarVista('selector');
+  } else {
+    document.getElementById('resumenBar').style.display = 'none';
+    document.getElementById('navTabs').style.display = 'none';
+    document.getElementById('clientesTabs').style.display = 'none';
+    mostrarVista('nueva');
+  }
 }
 
 // ── HISTORIAL ─────────────────────────────────────────────────────────────
@@ -685,6 +843,7 @@ function renderHistorial() {
           </div>
         </div>
         <div class="hist-items">${h.items.map(i => `${i.nombre}${i.cantidad > 1 ? ' ×'+i.cantidad : ''} $${i.subtotal.toLocaleString('es-CL')}`).join(' · ')}</div>
+        <button class="btn-eliminar" style="margin-top:6px;font-size:11px" onclick="eliminarCuentaDelHistorial('${h.idHistorial}')">🗑 Quitar del historial</button>
       </div>
     `).join('')}
   `;
@@ -725,7 +884,12 @@ function mostrarVistaInicial(id) {
 
 function volverInicio() {
   document.querySelectorAll('.vista').forEach(v => v.classList.remove('activa'));
-  document.getElementById('vista-nueva').classList.add('activa');
+  if (Object.keys(cuentasAbiertas).length) {
+    renderSelector();
+    document.getElementById('vista-selector').classList.add('activa');
+  } else {
+    document.getElementById('vista-nueva').classList.add('activa');
+  }
 }
 
 function renderHistorialInicial() {
@@ -757,23 +921,69 @@ function renderHistorialInicial() {
           </div>
         </div>
         <div class="hist-items">${h.items.map(i => `${i.nombre}${i.cantidad > 1 ? ' ×'+i.cantidad : ''} $${i.subtotal.toLocaleString('es-CL')}`).join(' · ')}</div>
+        <button class="btn-eliminar" style="margin-top:6px;font-size:11px" onclick="eliminarCuentaDelHistorial('${h.idHistorial}')">🗑 Quitar del historial</button>
       </div>
     `).join('')}
   `;
 }
 
-// ── LIMPIAR HISTORIAL ─────────────────────────────────────────────────────
-function limpiarHistorial() {
-  if (confirm("¿Limpiar todo el historial del día? Esta acción no se puede deshacer.")) {
-    historial = [];
-    localStorage.removeItem('historial_spa');
-    renderHistorialInicial();
-    alert("✅ Historial limpiado correctamente.");
-  }
+// ── BORRAR DEL HISTORIAL (individual y total) ──────────────────────────────
+// Quita SOLO una cuenta puntual del historial local. No afecta Google Sheets
+// (esa cuenta ya quedó registrada ahí de forma permanente al cobrarla) ni
+// afecta a las cuentas que siguen abiertas (aún no cobradas).
+function eliminarCuentaDelHistorial(idHistorial) {
+  const cuenta = historial.find(h => h.idHistorial === idHistorial);
+  const nombreCuenta = cuenta ? cuenta.nombre : 'esta cuenta';
+  if (!confirm(`¿Quitar del historial la cuenta de ${nombreCuenta}?\n\nEsto NO afecta el registro ya guardado en Google Sheets, solo lo que se ve en la app.`)) return;
+  historial = historial.filter(h => h.idHistorial !== idHistorial);
+  localStorage.setItem('historial_spa', JSON.stringify(historial));
+  renderHistorialInicial();
+  renderHistorial();
 }
 
-// ── INIT ──────────────────────────────────────────────────────────────────
-renderCatalogo();
+// Borra TODO el historial local del día (doble confirmación por ser una acción irreversible en la app).
+// Las cuentas que siguen ABIERTAS (sin cobrar) nunca se ven afectadas por este botón,
+// sin importar cuántos días lleven abiertas: viven en un almacenamiento aparte.
+function limpiarHistorial() {
+  if (!confirm("¿Limpiar todo el historial del día?\n\nEsto borrará de la app TODO el historial de cuentas ya cobradas.\nLas cuentas que sigan abiertas (aún sin cobrar) NO se verán afectadas.")) return;
+  if (!confirm("Confirma nuevamente: esta acción no se puede deshacer.\n\n¿Borrar todo el historial del día?")) return;
+  historial = [];
+  localStorage.removeItem('historial_spa');
+  renderHistorialInicial();
+  renderHistorial();
+  alert("✅ Historial del día limpiado correctamente.\n\nLas cuentas que seguían abiertas continúan intactas.");
+}
+
+// ── INIT / RESTAURACIÓN AUTOMÁTICA ─────────────────────────────────────────
+// Al abrir o recargar la app, si había cuentas abiertas guardadas (por cierre
+// inesperado del navegador, corte de luz, etc.), se restauran todas tal como
+// quedaron, sin perder ninguna.
+function inicializarApp() {
+  renderCatalogo();
+  const idsAbiertas = Object.keys(cuentasAbiertas);
+
+  if (!idsAbiertas.length) {
+    // No hay nada que restaurar: pantalla de inicio normal (formulario de nueva cuenta)
+    return;
+  }
+
+  document.getElementById('resumenBar').style.display = 'flex';
+  document.getElementById('navTabs').style.display = 'flex';
+  document.getElementById('clientesTabs').style.display = 'flex';
+  renderClientesTabs();
+
+  // Si la cuenta activa guardada ya no existe (caso raro / dato corrupto), se usa la primera disponible
+  if (!cuentaActivaId || !cuentasAbiertas[cuentaActivaId]) {
+    cuentaActivaId = idsAbiertas[0];
+    guardarCuentasAbiertas();
+  }
+
+  // Siempre se muestra primero el selector, sin importar si hay una o varias cuentas abiertas
+  renderSelector();
+  mostrarVista('selector');
+}
+
+inicializarApp();
 </script>
 </body>
 </html>
