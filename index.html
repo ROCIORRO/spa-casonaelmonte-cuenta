@@ -482,11 +482,72 @@ const CATALOGO = [
 
 // ── ESTADO ────────────────────────────────────────────────────────────────
 // cuentasAbiertas: { id: {nombre, plan, atiende, responsable, items, hora, fecha} }
-let cuentasAbiertas = JSON.parse(localStorage.getItem('cuentas_abiertas_spa') || '{}');
+
+// Saneamiento automático: si hay datos guardados de una versión anterior de la
+// app con una estructura distinta (incompatible), se descartan de forma segura
+// en vez de dejar que rompan la carga de la app. No afecta Google Sheets, que
+// ya guardó de forma permanente cualquier cuenta cobrada anteriormente.
+function leerJSONSeguro(clave, porDefecto) {
+  try {
+    const crudo = localStorage.getItem(clave);
+    if (!crudo) return porDefecto;
+    const datos = JSON.parse(crudo);
+    // Verificación básica de forma: debe coincidir con el tipo esperado
+    if (typeof porDefecto === 'object' && !Array.isArray(porDefecto) && (typeof datos !== 'object' || Array.isArray(datos) || datos === null)) {
+      throw new Error('forma inesperada (se esperaba objeto)');
+    }
+    if (Array.isArray(porDefecto) && !Array.isArray(datos)) {
+      throw new Error('forma inesperada (se esperaba lista)');
+    }
+    return datos;
+  } catch (e) {
+    console.warn(`Datos guardados en "${clave}" no compatibles con esta versión, se descartan de forma segura:`, e.message);
+    localStorage.removeItem(clave);
+    return porDefecto;
+  }
+}
+
+let cuentasAbiertas = leerJSONSeguro('cuentas_abiertas_spa', {});
 let cuentaActivaId = localStorage.getItem('cuenta_activa_spa') || null;
-let historial = JSON.parse(localStorage.getItem('historial_spa') || '[]');
+let historial = leerJSONSeguro('historial_spa', []);
 let itemSeleccionado = null;
 let qtyActual = 1;
+
+// Una cuenta se considera válida solo si tiene la forma mínima que la app necesita
+// para mostrarla sin romperse. Cuentas de versiones anteriores (estructura distinta)
+// se descartan de forma segura en vez de intentar usarlas a medias.
+function cuentaValida(c) {
+  return c && typeof c === 'object' && Array.isArray(c.items) && typeof c.nombre === 'string';
+}
+
+// Saneamiento: se descartan del estado en memoria (y del guardado) las cuentas
+// que no tengan la forma esperada, para que ninguna pantalla intente leerlas.
+(function sanearCuentasAbiertas() {
+  let huboCambios = false;
+  Object.keys(cuentasAbiertas).forEach(id => {
+    if (!cuentaValida(cuentasAbiertas[id])) {
+      delete cuentasAbiertas[id];
+      huboCambios = true;
+    }
+  });
+  if (cuentaActivaId && !cuentasAbiertas[cuentaActivaId]) {
+    cuentaActivaId = null;
+    huboCambios = true;
+  }
+  // También se descartan entradas del historial sin items válidos (de versiones anteriores)
+  const historialFiltrado = historial.filter(h => h && Array.isArray(h.items));
+  if (historialFiltrado.length !== historial.length) {
+    historial = historialFiltrado;
+    huboCambios = true;
+  }
+  if (huboCambios) {
+    localStorage.setItem('cuentas_abiertas_spa', JSON.stringify(cuentasAbiertas));
+    localStorage.setItem('historial_spa', JSON.stringify(historial));
+    if (cuentaActivaId) localStorage.setItem('cuenta_activa_spa', cuentaActivaId);
+    else localStorage.removeItem('cuenta_activa_spa');
+    console.warn('Se detectaron y limpiaron datos guardados de una versión anterior de la app.');
+  }
+})();
 
 // Getter de conveniencia: la cuenta con la que se está trabajando ahora mismo
 function cuentaActual() {
@@ -555,7 +616,7 @@ function cambiarCuentaActiva(id) {
 // Pantalla selector: lista de todas las cuentas abiertas (para elegir o crear una nueva)
 function renderSelector() {
   const cont = document.getElementById('selectorContenido');
-  const ids = Object.keys(cuentasAbiertas);
+  const ids = Object.keys(cuentasAbiertas).filter(id => cuentaValida(cuentasAbiertas[id]));
   if (!ids.length) {
     cont.innerHTML = '<div class="empty-cuenta">No hay cuentas abiertas todavía.<br>Toca "Abrir Nueva Cuenta" para comenzar.</div>';
     return;
@@ -581,7 +642,7 @@ function renderSelector() {
 // Barra de pestañas rápidas para saltar entre clientes sin volver al selector
 function renderClientesTabs() {
   const cont = document.getElementById('clientesTabs');
-  const ids = Object.keys(cuentasAbiertas);
+  const ids = Object.keys(cuentasAbiertas).filter(id => cuentaValida(cuentasAbiertas[id]));
   if (!ids.length) { cont.style.display = 'none'; return; }
   cont.style.display = 'flex';
   cont.innerHTML = ids.map(id => {
@@ -960,10 +1021,11 @@ function limpiarHistorial() {
 // quedaron, sin perder ninguna.
 function inicializarApp() {
   renderCatalogo();
-  const idsAbiertas = Object.keys(cuentasAbiertas);
+  const idsAbiertas = Object.keys(cuentasAbiertas).filter(id => cuentaValida(cuentasAbiertas[id]));
 
   if (!idsAbiertas.length) {
-    // No hay nada que restaurar: pantalla de inicio normal (formulario de nueva cuenta)
+    // No hay nada que restaurar: se muestra el formulario de nueva cuenta
+    document.getElementById('vista-nueva').classList.add('activa');
     return;
   }
 
